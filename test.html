@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>加速度峰值測試器</title>
+    <style>
+        body { margin: 0; background: #000; color: #0f0; font-family: monospace; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .data-box { width: 90%; background: #111; border: 1px solid #0f0; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .label { font-size: 1rem; color: #888; }
+        .value { font-size: 3rem; font-weight: bold; margin: 10px 0; }
+        .peak { color: #ff00ff; }
+        button { width: 90%; padding: 20px; font-size: 1.2rem; background: #0f0; color: #000; border: none; border-radius: 5px; font-weight: bold; }
+        .history { width: 90%; font-size: 0.9rem; max-height: 200px; overflow-y: auto; color: #ccc; border-top: 1px solid #444; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>SENSOR DEBUG</h2>
+
+    <div class="data-box">
+        <div class="label">當前力道 (Current Force)</div>
+        <div id="currentForce" class="value">0.00</div>
+    </div>
+
+    <div class="data-box">
+        <div class="label">歷史峰值 (Max Peak)</div>
+        <div id="maxPeak" class="value peak">0.00</div>
+    </div>
+
+    <button id="startBtn">啟動感測器</button>
+    <button id="resetBtn" style="margin-top:10px; background:#444; color:#fff;">重置峰值</button>
+
+    <p style="color:#666; font-size:0.8rem; margin:20px 0;">用力揮動手機，觀察數值變化</p>
+    
+    <div class="history" id="historyLog">歷史擊球紀錄：<br></div>
+
+    <script>
+        let maxPeak = 0;
+        const currentDisplay = document.getElementById('currentForce');
+        const peakDisplay = document.getElementById('maxPeak');
+        const historyLog = document.getElementById('historyLog');
+
+        document.getElementById('resetBtn').onclick = () => {
+            maxPeak = 0;
+            peakDisplay.innerText = "0.00";
+            historyLog.innerHTML = "歷史擊球紀錄：<br>";
+        };
+
+        document.getElementById('startBtn').onclick = async () => {
+            if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                const permission = await DeviceMotionEvent.requestPermission();
+                if (permission === 'granted') start();
+            } else {
+                start();
+            }
+            document.getElementById('startBtn').style.display = 'none';
+        };
+
+        function start() {
+            window.addEventListener('devicemotion', (event) => {
+                const acc = event.acceleration;
+                if (!acc) return;
+
+                // 計算總加速度向量
+                const force = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
+                
+                // 即時顯示 (取小數點後兩位)
+                currentDisplay.innerText = force.toFixed(2);
+
+                // 更新峰值
+                if (force > maxPeak) {
+                    maxPeak = force;
+                    peakDisplay.innerText = maxPeak.toFixed(2);
+                }
+
+                // 如果偵測到較大的揮動 (例如 > 20)，紀錄到歷史
+                if (force > 20) {
+                    const now = new Date();
+                    const timeStr = `${now.getSeconds()}.${now.getMilliseconds()}`;
+                    // 這裡簡單做個延遲，避免連續洗板
+                    debounceLog(force.toFixed(2));
+                }
+            });
+        }
+
+        let lastLogTime = 0;
+        function debounceLog(val) {
+            const now = Date.now();
+            if (now - lastLogTime > 500) {
+                historyLog.innerHTML += `> 偵測到力道: ${val} <br>`;
+                lastLogTime = now;
+                // 自動滾動到底部
+                historyLog.scrollTop = historyLog.scrollHeight;
+            }
+        }
+    </script>
+</body>
+</html>
